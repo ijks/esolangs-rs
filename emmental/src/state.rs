@@ -84,8 +84,9 @@ impl<IO: SymbolIO> State<IO> {
                 self.stack.push(sym)
             }
             PrimOp::Duplicate => {
-                let sym = self.stack.peek()?;
-                self.stack.push(*sym)
+                let sym = self.stack.pop()?;
+                self.stack.push(sym);
+                self.stack.push(sym)
             }
             PrimOp::Supplant => {
                 let sym = self.stack.pop()?;
