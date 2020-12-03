@@ -107,7 +107,15 @@ impl Intrinsic {
                 state.push_element(Element::Operation(op));
                 Ok(())
             }
-            Self::Install => todo!(),
+            Self::Install => {
+                let sym = state.pop_symbol()?;
+                let op = state.pop_operation()?;
+                let mut interp = state.pop_interpreter()?;
+
+                interp.install(sym, op)?;
+                state.push_element(Element::Interpreter(interp));
+                Ok(())
+            }
             Self::GetParent => {
                 let interpreter = state.pop_interpreter()?;
                 let parent = interpreter.parent().ok_or(Error::NoParent)?.clone();
