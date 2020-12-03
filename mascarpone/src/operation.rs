@@ -159,8 +159,15 @@ impl Intrinsic {
                 state.push_element(Element::Interpreter(interp));
                 Ok(())
             }
-            Self::QuoteString => todo!(),
-            Self::QuoteSymbol => todo!(),
+            Self::QuoteString => {
+                state.push_element(Element::Symbol(crate::STRING_LEFT_DELIM));
+                state.push_element(Element::Interpreter(Interpreter::quote_string()));
+                Ok(())
+            }
+            Self::QuoteSymbol => {
+                state.push_element(Element::Interpreter(Interpreter::quote_symbol()));
+                Ok(())
+            }
             Self::Input => todo!(),
             Self::Output => todo!(),
             Self::Dup => {

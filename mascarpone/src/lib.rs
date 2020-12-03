@@ -7,6 +7,9 @@ mod state;
 
 pub type Symbol = char;
 
+const STRING_LEFT_DELIM: Symbol = '[';
+const STRING_RIGHT_DELIM: Symbol = ']';
+
 #[derive(Error, Debug, Clone)]
 pub enum Error {
     #[error("missing parent interpreter")]

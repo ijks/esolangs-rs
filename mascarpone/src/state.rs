@@ -1,6 +1,9 @@
 use std::{collections::VecDeque, iter::Extend};
 
-use crate::{interpreter::Interpreter, operation::Operation, stack::Stack, Error, Result, Symbol};
+use crate::{
+    interpreter::Interpreter, operation::Operation, stack::Stack, Error, Result, Symbol,
+    STRING_LEFT_DELIM, STRING_RIGHT_DELIM,
+};
 
 #[derive(Debug)]
 pub struct State {
@@ -55,15 +58,15 @@ impl State {
         let mut nesting = 0u32;
         let mut string = VecDeque::new();
 
-        if self.pop_symbol()? != ']' {
+        if self.pop_symbol()? != STRING_RIGHT_DELIM {
             return Err(Error::MalformedString);
         }
 
         loop {
             let sym = self.pop_symbol()?;
             match sym {
-                ']' => nesting += 1,
-                '[' => {
+                STRING_RIGHT_DELIM => nesting += 1,
+                STRING_LEFT_DELIM => {
                     if nesting == 0 {
                         return Ok(string.into());
                     } else {
@@ -102,7 +105,7 @@ mod tests {
 
     fn delimiterless_string() -> impl Strategy<Value = Vec<Symbol>> {
         any::<Vec<Symbol>>().prop_filter("symbol strings must not contain delimiters", |s| {
-            !(s.contains(&'[') || s.contains(&']'))
+            !(s.contains(&STRING_LEFT_DELIM) || s.contains(&STRING_RIGHT_DELIM))
         })
     }
 
