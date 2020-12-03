@@ -44,7 +44,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_pop_while_empty() {
+    fn pop_while_empty() {
         let mut stack = Stack::<u32>::new();
 
         let mut iter = stack.pop_while(|_| true);
@@ -53,7 +53,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pop_while_const_false() {
+    fn pop_while_const_false() {
         let mut stack = Stack {
             storage: vec![1u32, 2, 3],
         };
@@ -64,7 +64,7 @@ mod tests {
     }
 
     #[test]
-    fn test_pop_while() {
+    fn pop_while() {
         let mut stack = Stack {
             storage: vec![1u32, 2, 3],
         };
