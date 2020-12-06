@@ -1,10 +1,25 @@
-use std::{collections::HashMap, mem};
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+    mem,
+};
 
 use crate::{
     operation::{Intrinsic, Operation},
     state::State,
     Error, Result, Symbol,
 };
+
+#[derive(Debug, Clone)]
+enum Variant {
+    Initial,
+    QuoteString,
+    QuoteSymbol,
+    Mapping {
+        mapping: HashMap<Symbol, Operation>,
+        default: Operation,
+    },
+}
 
 #[derive(Debug, Clone)]
 pub enum Interpreter {
@@ -62,14 +77,6 @@ impl Interpreter {
         }
     }
 
-    pub fn execute(&mut self, program: &[Symbol], state: &mut State) -> Result<()> {
-        for &sym in program {
-            self.interpret(sym, state)?;
-        }
-
-        Ok(())
-    }
-
     pub fn extract(&self, sym: Symbol) -> Result<Operation> {
         match self {
             Self::Null => Err(Error::NullInterpreter),
@@ -107,19 +114,14 @@ impl Interpreter {
         }
     }
 
-    pub fn interpret(&mut self, sym: Symbol, state: &mut State) -> Result<()> {
+    pub fn interpret<IO: Read + Write>(&self, sym: Symbol, state: &mut State<IO>) -> Result<()> {
         let op = self.extract(sym)?;
         op.execute(state)
     }
 }
 
-#[derive(Debug, Clone)]
-enum Variant {
-    Initial,
-    QuoteString,
-    QuoteSymbol,
-    Mapping {
-        mapping: HashMap<Symbol, Operation>,
-        default: Operation,
-    },
+impl Default for Interpreter {
+    fn default() -> Self {
+        Self::initial()
+    }
 }

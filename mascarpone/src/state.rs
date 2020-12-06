@@ -1,4 +1,7 @@
-use std::{collections::VecDeque, iter::Extend};
+use std::{
+    collections::VecDeque,
+    io::{self, BufRead, BufReader, Read, Write},
+};
 
 use crate::{
     interpreter::Interpreter, operation::Operation, stack::Stack, Error, Result, Symbol,
@@ -6,9 +9,10 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct State {
+pub struct State<IO> {
     stack: Stack<Element>,
     pub interpreter: Interpreter,
+    io: IO,
 }
 
 #[derive(Debug, Clone)]
@@ -18,12 +22,24 @@ pub enum Element {
     Interpreter(Interpreter),
 }
 
-impl State {
-    pub fn new(interpreter: Interpreter) -> Self {
+impl<IO> State<IO> {
+    pub fn new(io: IO) -> Self {
         Self {
             stack: Stack::new(),
-            interpreter,
+            interpreter: Interpreter::default(),
+            io,
         }
+    }
+
+    pub fn execute(&mut self, program: &[Symbol]) -> Result<()>
+    where
+        IO: Read + Write,
+    {
+        for &sym in program {
+            self.interpreter.clone().interpret(sym, self)?
+        }
+
+        Ok(())
     }
 
     pub fn pop_element(&mut self) -> Result<Element> {
@@ -95,6 +111,25 @@ impl State {
     pub fn peek_element(&self) -> Result<&Element> {
         self.stack.peek().ok_or(Error::EmptyStack)
     }
+
+    pub fn read_symbol(&mut self) -> io::Result<Symbol>
+    where
+        IO: Read,
+    {
+        use utf8_chars::BufReadCharsExt;
+
+        let mut buf_io = BufReader::with_capacity(4, &mut self.io);
+        buf_io
+            .read_char()?
+            .ok_or(io::ErrorKind::UnexpectedEof.into())
+    }
+
+    pub fn write_symbol(&mut self, sym: Symbol) -> io::Result<()>
+    where
+        IO: Write,
+    {
+        write!(self.io, "{}", sym)
+    }
 }
 
 #[cfg(test)]
@@ -111,14 +146,14 @@ mod tests {
 
     #[test]
     fn pop_string_fails_on_empty_stack() {
-        let mut state = State::new(Interpreter::Null);
+        let mut state = State::new(());
 
         assert!(state.pop_string().is_err());
     }
 
     #[test]
     fn pop_string_fails_on_delimiterless() {
-        let mut state = State::new(Interpreter::Null);
+        let mut state = State::new(());
         state.push_element(Element::Symbol('a'));
 
         assert!(state.pop_string().is_err());
@@ -127,7 +162,7 @@ mod tests {
     proptest! {
         #[test]
         fn push_string_pop_string_succeeds(string in delimiterless_string()) {
-            let mut state = State::new(Interpreter::Null);
+            let mut state = State::new(());
 
             state.push_string(string.clone());
             state.pop_string()?;
@@ -135,7 +170,7 @@ mod tests {
 
         #[test]
         fn push_string_pop_string_roundtrips(string in delimiterless_string()) {
-            let mut state = State::new(Interpreter::Null);
+            let mut state = State::new(());
 
             state.push_string(string.clone());
             let result = state.pop_string()?;

@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    io::{Read, Write},
+};
 
 use crate::{
     interpreter::Interpreter,
@@ -13,7 +16,7 @@ pub enum Operation {
 }
 
 impl Operation {
-    pub fn execute(&self, state: &mut State) -> Result<()> {
+    pub fn execute<IO: Read + Write>(&self, state: &mut State<IO>) -> Result<()> {
         match self {
             Self::Intrinsic(op) => op.execute(state),
             Self::Program(program, interp) => todo!(),
@@ -88,7 +91,7 @@ impl Intrinsic {
             .expect("intrisic operation needs an associated symbol")
     }
 
-    pub fn execute(&self, state: &mut State) -> Result<()> {
+    pub fn execute<IO: Read + Write>(&self, state: &mut State<IO>) -> Result<()> {
         match self {
             Self::Reify => {
                 let interp = state.interpreter.clone();
@@ -168,8 +171,16 @@ impl Intrinsic {
                 state.push_element(Element::Interpreter(Interpreter::quote_symbol()));
                 Ok(())
             }
-            Self::Input => todo!(),
-            Self::Output => todo!(),
+            Self::Input => {
+                let sym = state.read_symbol()?;
+                state.push_element(Element::Symbol(sym));
+                Ok(())
+            }
+            Self::Output => {
+                let sym = state.pop_symbol()?;
+                state.write_symbol(sym)?;
+                Ok(())
+            }
             Self::Dup => {
                 let elem = state.peek_element()?.clone();
                 state.push_element(elem);
