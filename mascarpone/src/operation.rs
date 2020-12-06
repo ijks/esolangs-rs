@@ -95,7 +95,7 @@ impl Intrinsic {
         match self {
             Self::Reify => {
                 let interp = state.interpreter.clone();
-                state.push_element(Element::Interpreter(interp));
+                state.push_element(Element::Interpreter(Some(interp)));
                 Ok(())
             }
             Self::Deify => {
@@ -116,19 +116,20 @@ impl Intrinsic {
                 let mut interp = state.pop_interpreter()?;
 
                 interp.install(sym, op)?;
-                state.push_element(Element::Interpreter(interp));
+                state.push_element(Element::Interpreter(Some(interp)));
                 Ok(())
             }
             Self::GetParent => {
                 let interpreter = state.pop_interpreter()?;
                 let parent = interpreter.parent().ok_or(Error::NoParent)?.clone();
-                state.push_element(Element::Interpreter(parent));
+                state.push_element(Element::Interpreter(Some(parent)));
                 Ok(())
             }
             Self::SetParent => {
-                let (mut interp, new_parent) = (state.pop_interpreter()?, state.pop_interpreter()?);
+                let (mut interp, new_parent) =
+                    (state.pop_interpreter()?, state.pop_interpreter_nullable()?);
                 interp.set_parent(new_parent);
-                state.push_element(Element::Interpreter(interp));
+                state.push_element(Element::Interpreter(Some(interp)));
                 Ok(())
             }
             Self::Create => {
@@ -148,18 +149,18 @@ impl Intrinsic {
                 };
 
                 state.push_string(program);
-                state.push_element(Element::Interpreter(interp));
+                state.push_element(Element::Interpreter(Some(interp)));
                 Ok(())
             }
             Self::Perform => state.pop_operation()?.execute(state),
             Self::Null => {
-                state.push_element(Element::Interpreter(Interpreter::Null));
+                state.push_element(Element::Interpreter(None));
                 Ok(())
             }
             Self::Uniform => {
                 let op = state.pop_operation()?;
                 let interp = Interpreter::uniform(op);
-                state.push_element(Element::Interpreter(interp));
+                state.push_element(Element::Interpreter(Some(interp)));
                 Ok(())
             }
             Self::QuoteString => {

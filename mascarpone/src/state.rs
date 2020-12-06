@@ -19,7 +19,7 @@ pub struct State<IO> {
 pub enum Element {
     Symbol(Symbol),
     Operation(Operation),
-    Interpreter(Interpreter),
+    Interpreter(Option<Interpreter>),
 }
 
 impl<IO> State<IO> {
@@ -47,6 +47,11 @@ impl<IO> State<IO> {
     }
 
     pub fn pop_interpreter(&mut self) -> Result<Interpreter> {
+        self.pop_interpreter_nullable()
+            .and_then(|i| i.ok_or(Error::NullInterpreter))
+    }
+
+    pub fn pop_interpreter_nullable(&mut self) -> Result<Option<Interpreter>> {
         if let Element::Interpreter(i) = self.pop_element()? {
             Ok(i)
         } else {
@@ -114,12 +119,12 @@ impl<IO> State<IO> {
 
     pub fn start_quote_string(&mut self) {
         let old_interp = std::mem::replace(&mut self.interpreter, Interpreter::quote_string());
-        self.interpreter.set_parent(old_interp);
+        self.interpreter.set_parent(Some(old_interp));
     }
 
     pub fn start_quote_symbol(&mut self) {
         let old_interp = std::mem::replace(&mut self.interpreter, Interpreter::quote_symbol());
-        self.interpreter.set_parent(old_interp);
+        self.interpreter.set_parent(Some(old_interp));
     }
 
     pub fn read_symbol(&mut self) -> io::Result<Symbol>

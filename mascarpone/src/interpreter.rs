@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     io::{Read, Write},
-    mem,
 };
 
 use crate::{
@@ -22,44 +21,46 @@ enum Variant {
     },
 }
 
+// Note that there's no explicit "null interpreter"; instead, the parent interpreter is
+// optional, as are interpreter values on the stack. This means we diverge slightly from
+// what the spec explicitly describes, in that e.g. trying to deify a null interpreter is
+// already an error, rather than trying to execute an operation with it. Practically,
+// there's not a real difference.
 #[derive(Debug, Clone)]
-pub enum Interpreter {
-    Null,
-    Defined {
-        parent: Box<Interpreter>, // May need to use Rc instead.
-        variant: Variant,
-    },
+pub struct Interpreter {
+    parent: Option<Box<Interpreter>>, // May need to use Rc instead.
+    variant: Variant,
 }
 
 impl Interpreter {
-    fn from_variant(variant: Variant) -> Self {
-        Self::Defined {
-            parent: Box::new(Self::Null),
+    fn new(variant: Variant) -> Self {
+        Self {
+            parent: None,
             variant,
         }
     }
 
     pub fn initial() -> Self {
-        Self::from_variant(Variant::Initial)
+        Self::new(Variant::Initial)
     }
 
     pub fn quote_string() -> Self {
-        Self::from_variant(Variant::QuoteString)
+        Self::new(Variant::QuoteString)
     }
 
     pub fn quote_symbol() -> Self {
-        Self::from_variant(Variant::QuoteSymbol)
+        Self::new(Variant::QuoteSymbol)
     }
 
     pub fn uniform(op: Operation) -> Self {
-        Self::from_variant(Variant::Mapping {
+        Self::new(Variant::Mapping {
             mapping: HashMap::new(),
             default: op,
         })
     }
 
     pub fn mapping(mapping: HashMap<Symbol, Operation>) -> Self {
-        Self::from_variant(Variant::Mapping {
+        Self::new(Variant::Mapping {
             mapping,
             default: Operation::Intrinsic(Intrinsic::NoOp),
         })
@@ -68,58 +69,45 @@ impl Interpreter {
     // TODO: factor out a `DefinedInterpreter` or the like, so we can just
     // access the parent as a field.
     pub fn parent(&self) -> Option<&Self> {
-        match self {
-            Self::Null => None,
-            Self::Defined { parent, .. } => Some(parent.as_ref()),
-        }
+        self.parent.as_deref()
     }
 
-    pub fn set_parent(&mut self, new_parent: Interpreter) {
-        if let Self::Defined { parent, .. } = self {
-            *parent.as_mut() = new_parent;
-        }
+    pub fn set_parent(&mut self, parent: Option<Interpreter>) {
+        self.parent = parent.map(Box::new);
     }
 
-    pub fn variant(&self) -> Option<&Variant> {
-        match self {
-            Self::Null => None,
-            Self::Defined { variant, .. } => Some(variant),
-        }
-    }
-
-    pub fn variant_mut(&mut self) -> Option<&mut Variant> {
-        match self {
-            Self::Null => None,
-            Self::Defined { variant, .. } => Some(variant),
-        }
+    pub fn variant(&self) -> &Variant {
+        &self.variant
     }
 
     pub fn extract(&self, sym: Symbol) -> Result<Operation> {
-        match self.variant().ok_or(Error::NullInterpreter)? {
+        match self.variant {
             Variant::QuoteString | Variant::QuoteSymbol => Err(Error::WrongInterpreterVariant),
             Variant::Initial => Ok(Operation::Intrinsic(
                 Intrinsic::from_symbol(sym).unwrap_or(Intrinsic::NoOp),
             )),
-            Variant::Mapping { mapping, default } => {
-                Ok(mapping.get(&sym).unwrap_or(default).clone())
-            }
+            Variant::Mapping {
+                ref mapping,
+                ref default,
+            } => Ok(mapping.get(&sym).unwrap_or(default).clone()),
         }
     }
 
     pub fn install(&mut self, sym: Symbol, op: Operation) -> Result<()> {
-        let variant = self.variant_mut().ok_or(Error::NullInterpreter)?;
-        match variant {
+        match self.variant {
             Variant::QuoteString | Variant::QuoteSymbol => Err(Error::WrongInterpreterVariant),
             Variant::Initial => {
                 let mut mapping = Operation::intrinsic_mapping();
                 mapping.insert(sym, op);
-                *variant = Variant::Mapping {
+                self.variant = Variant::Mapping {
                     mapping,
                     default: Operation::Intrinsic(Intrinsic::NoOp),
                 };
                 Ok(())
             }
-            Variant::Mapping { mapping, .. } => {
+            Variant::Mapping {
+                ref mut mapping, ..
+            } => {
                 mapping.insert(sym, op);
                 Ok(())
             }
@@ -127,7 +115,7 @@ impl Interpreter {
     }
 
     pub fn interpret<IO: Read + Write>(&self, sym: Symbol, state: &mut State<IO>) -> Result<()> {
-        match self.variant().ok_or(Error::NullInterpreter)? {
+        match self.variant {
             Variant::QuoteString => {
                 state.push_element(Element::Symbol(sym));
 
@@ -142,20 +130,18 @@ impl Interpreter {
 
                 Ok(())
             }
-
             Variant::QuoteSymbol => {
                 state.push_element(Element::Symbol(sym));
                 state.interpreter = self.parent().expect("parent should be defined").clone();
                 Ok(())
             }
-
             Variant::Initial => Intrinsic::from_symbol(sym)
                 .unwrap_or(Intrinsic::NoOp)
                 .execute(state),
-
-            Variant::Mapping { mapping, default } => {
-                mapping.get(&sym).unwrap_or(default).execute(state)
-            }
+            Variant::Mapping {
+                ref mapping,
+                ref default,
+            } => mapping.get(&sym).unwrap_or(&default).execute(state),
         }
     }
 }
