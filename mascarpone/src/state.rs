@@ -112,6 +112,16 @@ impl<IO> State<IO> {
         self.stack.peek().ok_or(Error::EmptyStack)
     }
 
+    pub fn start_quote_string(&mut self) {
+        let old_interp = std::mem::replace(&mut self.interpreter, Interpreter::quote_string());
+        self.interpreter.set_parent(old_interp);
+    }
+
+    pub fn start_quote_symbol(&mut self) {
+        let old_interp = std::mem::replace(&mut self.interpreter, Interpreter::quote_symbol());
+        self.interpreter.set_parent(old_interp);
+    }
+
     pub fn read_symbol(&mut self) -> io::Result<Symbol>
     where
         IO: Read,

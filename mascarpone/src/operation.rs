@@ -164,11 +164,11 @@ impl Intrinsic {
             }
             Self::QuoteString => {
                 state.push_element(Element::Symbol(crate::STRING_LEFT_DELIM));
-                state.push_element(Element::Interpreter(Interpreter::quote_string()));
+                state.start_quote_string();
                 Ok(())
             }
             Self::QuoteSymbol => {
-                state.push_element(Element::Interpreter(Interpreter::quote_symbol()));
+                state.start_quote_symbol();
                 Ok(())
             }
             Self::Input => {
